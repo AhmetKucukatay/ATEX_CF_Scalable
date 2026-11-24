@@ -12,6 +12,7 @@ import math
 import os
 import sys
 import time
+import copy
 
 import torch.nn as nn
 import torch
@@ -110,7 +111,7 @@ class GCN_extend(GCN):
                     # Update best model
                     if val_acc > best_val_acc:
                         best_val_acc = val_acc
-                        best_model_state = self.state_dict().copy()
+                        best_model_state = copy.deepcopy(self.state_dict())
 
                     print(
                         f"Epoch {epoch}: Train Loss {loss.item():.4f}, Val Loss {val_loss.item():.4f}, Val Acc {val_acc:.4f}")

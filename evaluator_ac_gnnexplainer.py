@@ -180,7 +180,7 @@ header = ['success', 'target_node', 'new_idx', 'added_edges', 'removed_edges', '
           'original_pred', 'new_pred', 'extended_adj', 'cf_adj', 'extended_feat', 'sub_labels', 'new_idx_map_tgt_node']
 
 # counterfactual explanation subgraph path
-time_name = '2025-11-20'
+time_name = '2026-11-24'
 counterfactual_explanation_subgraph_path = base_path + f'/results/{time_name}/counterfactual_subgraph_{test_model}/{attack_type}_{attack_method}_{explanation_type}_{explainer_method}_{dataset_name}_budget{[MAX_EDITS]}-{SEED_NUM}'
 
 with open(
@@ -202,6 +202,8 @@ added_edges_num = 0.0
 deleted_edges_num = 0.0
 edited_num = 0.0
 S_plau = 0.0
+mismatches = []
+invalid_success = []
 for i in df.index:
     orig_sub_adj = torch.tensor(df["extended_adj"][i])
     edited_sub_adj = torch.tensor(df["cf_adj"][i])
@@ -226,6 +228,22 @@ for i in df.index:
 
     a1 = y_pred_orig[output_target_idx].argmax()
     a2 = new_label[df["new_idx"][i]].argmax()
+    actual_flip = a1.item() != a2.item()
+    if bool(df["success"][i]):
+        edits = int(
+            torch.triu(edited_sub_adj != orig_sub_adj, diagonal=1).sum().item()
+        )
+        if edits > MAX_EDITS:
+            invalid_success.append((int(df["target_node"][i]), edits))
+    if bool(df["success"][i]) != actual_flip:
+        actual_edits = int(
+            torch.triu(edited_sub_adj != orig_sub_adj, diagonal=1).sum().item()
+        )
+        mismatches.append((
+            int(df["target_node"][i]),
+            int(df["explanation_size"][i]),
+            actual_edits
+        ))
     if a1.item() != a2.item():
         misclas_num += 1
         # print(df["target_node"][i], df["new_idx"][i])
@@ -257,6 +275,13 @@ for i in df.index:
                                                                                  tau_c)
         S_plau += 2 * (1 - 1 / (1 + torch.exp(-1 * k * L_plau)))
         # print(S_plau)
+
+print("Disagreements:", len(mismatches))
+print("First 10 mismatches (node, recorded edits, actual edits):", mismatches[:10])
+print("Mismatches exceeding budget:", sum(x[2] > MAX_EDITS for x in mismatches))
+print("Within-budget mismatches:", [x for x in mismatches if x[2] <= MAX_EDITS])
+print("Invalid successful CFs:", invalid_success[:10])
+print("Invalid successful CF count:", len(invalid_success))
 
 print("Num of target nodes: ", len(target_node_list))
 print("Num of misclassification: ", misclas_num)

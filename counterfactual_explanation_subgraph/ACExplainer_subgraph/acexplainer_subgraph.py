@@ -350,31 +350,62 @@ def generate_acexplainer_subgraph(df_orbit,
     }, time_cost, subgraph
 
 
+
 def get_attack_nodes(dataset_name, attack_model, df_orbit, target_node, data, method="GOttack", top_t=10):
     """Obtain the list of attack nodes"""
-    if method == "GOttack":
-        # Implement the GOttack attack method and return high-influence nodes
-        # 1. Feature Similarity > 0.1
-        matching_index = df_orbit.index[df_orbit['two_Orbit_type'] == '1518'].tolist()
-        if len(matching_index) < top_t:
-            matching_index += df_orbit.index[df_orbit['two_Orbit_type'] == '1519'].tolist()
 
+    if method == "GOttack":
+
+        # Candidate selection
+        if dataset_name == "BA-SHAPES":
+            top_orbits = df_orbit[
+                ["Orbit_type_I", "Orbit_type_II"]
+            ].astype(int)
+
+            matching_index = df_orbit.index[
+                top_orbits.isin([15, 18]).any(axis=1)
+            ].tolist()
+
+            attack_model.matching_index = matching_index
+
+        else:
+            matching_index = df_orbit.index[
+                df_orbit["two_Orbit_type"] == "1518"
+            ].tolist()
+
+            if len(matching_index) < top_t:
+                matching_index += df_orbit.index[
+                    df_orbit["two_Orbit_type"] == "1519"
+                ].tolist()
+
+        print("Orbit candidate count:", len(matching_index))
+
+        # Feature similarity filtering
         similarities = []
-        feat_target = torch.tensor(data.features[target_node].todense(), dtype=torch.float32).flatten()
+        feat_target = torch.tensor(
+            data.features[target_node].todense(),
+            dtype=torch.float32
+        ).flatten()
+
         for i in matching_index:
             if i != target_node:
-                feat_i = torch.tensor(data.features[i].todense(), dtype=torch.float32).flatten()
+                feat_i = torch.tensor(
+                    data.features[i].todense(),
+                    dtype=torch.float32
+                ).flatten()
+
                 sim = F.cosine_similarity(
-                    feat_target.unsqueeze(0),  # Add batch dimension
-                    feat_i.unsqueeze(0),  # Add batch dimension
+                    feat_target.unsqueeze(0),
+                    feat_i.unsqueeze(0),
                     dim=1
-                )
-                sim = sim.item()
+                ).item()
+
                 if sim > 0.1:
                     similarities.append((i, sim))
 
         similarities.sort(key=lambda x: x[1], reverse=True)
         high_sim_node = [node for node, sim in similarities]
+
         if dataset_name == "chameleon":
             high_sim_node = matching_index
 
@@ -382,25 +413,42 @@ def get_attack_nodes(dataset_name, attack_model, df_orbit, target_node, data, me
         pass
 
         # High Impact Prioritization
-        attack_model.attack_cf(data.features, data.adj, data.labels, target_node, top_t, high_sim_node=high_sim_node)
+        attack_model.attack_cf(
+            data.features,
+            data.adj,
+            data.labels,
+            target_node,
+            top_t,
+            high_sim_node=high_sim_node
+        )
+
         best_edges = attack_model.best_edge_list
-        print("best edges: ", len(best_edges))
+        print("best edges:", len(best_edges))
 
         attack_nodes = [node[1] for node in best_edges]
         attack_nodes = list(set(attack_nodes))
 
         return attack_nodes
+
     elif method == "Random_Sampling":
-        attack_model.random_sampling(data.features, data.adj, data.labels, target_node, top_t)
+        attack_model.random_sampling(
+            data.features,
+            data.adj,
+            data.labels,
+            target_node,
+            top_t
+        )
+
         best_edges = attack_model.best_edge_list
-        print("best edges: ", len(best_edges))
+        print("best edges:", len(best_edges))
+
         attack_nodes = [node[1] for node in best_edges]
         attack_nodes = list(set(attack_nodes))
 
         return attack_nodes
+
     else:
-        # Other attack methods
-        return list(range(top_t))  # Simplified return
+        return list(range(top_t))
 
 
 def has_edge(edge_index, node_i, node_j):
@@ -562,6 +610,8 @@ if __name__ == '__main__':
     time_name = datetime.now().strftime("%Y-%m-%d")
     # counterfactual explanation subgraph path
     counterfactual_explanation_subgraph_path = base_path + f'/results/{time_name}/counterfactual_subgraph_{test_model}/{attack_type}_{attack_method}_{explanation_type}_{explainer_method}_{dataset_name}_budget{[MAX_EDITS]}-{SEED_NUM}'
+    if dataset_name == "BA-SHAPES":
+        counterfactual_explanation_subgraph_path += "_orbit15or18"
     if not os.path.exists(counterfactual_explanation_subgraph_path):
         os.makedirs(counterfactual_explanation_subgraph_path)
 
@@ -702,6 +752,7 @@ if __name__ == '__main__':
     target_node_list, target_node_list1 = select_test_nodes(dataset_name, attack_type, idx_test, pre_output, labels)
     target_node_list = target_node_list + target_node_list1
     target_node_list.sort()
+
     print(f"Test nodes number: {len(target_node_list)}, incorrect: {len(target_node_list1)}")
     # target_node_list = target_node_list[10:20]
 
@@ -713,16 +764,42 @@ if __name__ == '__main__':
     cfexp_subgraph = {}
     time_list = []
     mis_cases = 0
+    checkpoint_dir = os.path.join(
+        base_path, "progress",
+        f"{dataset_name}_{test_model}_seed{SEED_NUM}_k{MAX_EDITS}_e{NUM_EPOCHS_AC}_pr{int(PRUNING)}"
+    )
+    if dataset_name == "BA-SHAPES":
+        checkpoint_dir += "_orbit15or18"
+    os.makedirs(checkpoint_dir, exist_ok=True)
     for target_node in tqdm(target_node_list):
-        # target_node = 1978
-        cf_example, time_cost, subgraph = generate_acexplainer_subgraph(df_orbit, target_node, data, pyg_data,
-                                                                        gnn_model,
-                                                                        surrogate, pre_output, gcn_layer, attack_method,
-                                                                        top_t,
-                                                                        device, nhid, dropout, with_bias, test_model,
-                                                                        heads_num, dataset_name,
-                                                                        output_idx=idx_test)
-        # print(cf_example)
+        checkpoint = os.path.join(
+            checkpoint_dir, f"node_{int(target_node)}.pkl"
+        )
+
+        if os.path.exists(checkpoint):
+            with open(checkpoint, "rb") as f:
+                saved = pickle.load(f)
+            cf_example = saved["data"]
+            time_cost = saved["time_cost"]
+            subgraph = saved["subgraph"]
+        else:
+            cf_example, time_cost, subgraph = generate_acexplainer_subgraph(
+                df_orbit, target_node, data, pyg_data,
+                gnn_model, surrogate, pre_output,
+                gcn_layer, attack_method, top_t,
+                device, nhid, dropout, with_bias,
+                test_model, heads_num, dataset_name,
+                output_idx=idx_test
+            )
+
+            temporary = checkpoint + ".tmp"
+            with open(temporary, "wb") as f:
+                pickle.dump({
+                    "data": cf_example,
+                    "time_cost": time_cost,
+                    "subgraph": subgraph
+                }, f)
+            os.replace(temporary, checkpoint)
         print("Time for {} epochs of one example: {:.4f}s".format(NUM_EPOCHS_AC, time_cost))
         time_list.append(time_cost)
         cfexp_subgraph[target_node] = subgraph if cf_example['success'] else None

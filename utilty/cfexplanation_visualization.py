@@ -94,7 +94,7 @@ def visualize_cfexp_subgraph(
     # Extract modified edges within subgraph
     sub_added = [(reversed_mapping[i], reversed_mapping[j]) for i, j in added_edges if i in critical_nodes and j in critical_nodes]
     sub_removed = [(reversed_mapping[i], reversed_mapping[j]) for i, j in removed_edges if i in critical_nodes and j in critical_nodes]
-
+    return subgraph, true_subgraph, E_type # Skip PNG rendering during reproduction; preserve graph objects.
     # ===== 4. Visual configuration =====
     plt.figure(figsize=(14, 10))
     pos = nx.spring_layout(subgraph, seed=42, k=0.7 / len(critical_nodes) ** 0.5)

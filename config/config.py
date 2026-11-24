@@ -12,7 +12,7 @@
 TEST_MODEL = "GCN"  # ["GCN", "GraphTransformer", "GraphConv", "GAT"]
 
 # dataset
-DATA_NAME = "ogbn-arxiv"  # ["cora", "BA-SHAPES", "TREE-CYCLES", "Loan-Decision", "chameleon", "ogbn-arxiv"]
+DATA_NAME = "BA-SHAPES"  # ["cora", "BA-SHAPES", "TREE-CYCLES", "Loan-Decision", "chameleon", "ogbn-arxiv"]
 
 # running device
 DEVICE = 'cpu'  # ["cpu", "gpu"]
@@ -22,7 +22,7 @@ SEED_NUM = 102  # first experiment is 102, 103, 104
 
 ################ Explainer parameters ################
 EXPLANATION_TYPE = 'counterfactual'  # ['instance-level', 'class-level', 'counterfactual']
-EXPLAINER_METHOD = 'C2Explainer'  # ['GNNExplainer','PGExplainer','CFExplainer','ACExplainer','C2Explainer','INDUCE']
+EXPLAINER_METHOD = 'ACExplainer'  # ['GNNExplainer','PGExplainer','CFExplainer','ACExplainer','C2Explainer','INDUCE']
 ####################################################################
 
 ################ GNN model parameters for datasets ################
@@ -253,10 +253,10 @@ LEARNING_RATE_CF = 0.01  # 0.01
 ################ ACExplainer parameters for datasets ##############
 LEARNING_RATE_AC = 10 ** -3  # learning rate for acexplainer training
 MAX_ATTACK_NODES_NUM = 20  # max number of selected attacked nodes
-NUM_EPOCHS_AC = 100  # Num epochs for explainer
+NUM_EPOCHS_AC = 200  # Num epochs for explainer
 OPTIMIZER_AC = "SGD"  # GCN-'SGD' or 'Adadelta' or 'Adam'
 N_Momentum_AC = 0.9  # Nesterov momentum
-LAMBDA_PRED = 1.0  # Prediction loss weight GCN: 1.0, GT/GAT on cora:10.0
+LAMBDA_PRED = 1.5  # Prediction loss weight GCN: 1.0, GT/GAT on cora:10.0
 LAMBDA_DIST = 0.5  # Sparse term penalty weight 0.5
 LAMBDA_PLAU = 0.5  # Realistic penalty weight 0.5
 MAX_EDITS = 5  # Maximum disturbance budget
